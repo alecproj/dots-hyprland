@@ -15,7 +15,6 @@ depends=(
   fontconfig
   kitty
   matugen
-  otf-space-grotesk
   starship
   ttf-jetbrains-mono-nerd
   ttf-material-symbols-variable-git
