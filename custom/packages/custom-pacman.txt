@@ -1,0 +1,6 @@
+xdg-user-dirs
+openssh
+neovim
+npm
+fd
+ripgrep

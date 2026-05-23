@@ -1,0 +1,10 @@
+[terminal]
+vt = 1
+
+# [initial_session]
+# command = "start-hyprland"
+# user = "alec"
+
+[default_session]
+command = "dbus-run-session cage -s -mlast -d -- regreet"
+user = "greeter"
