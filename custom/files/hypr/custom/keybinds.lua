@@ -79,3 +79,17 @@ for i = 1, 10 do
         hl.dispatch(hl.dsp.window.move({ workspace = workspace_in_group(i)}))
     end)
 end
+
+--# Apps
+--## rebind Task manager
+hl.unbind("CTRL + SHIFT + Escape")
+hl.bind("CTRL + SHIFT + Escape", hl.dsp.exec_cmd("missioncenter"), { description = "App: Task manager" })
+--## bind Telegram
+hl.unbind("SUPER + T")
+hl.bind("SUPER + T", hl.dsp.exec_cmd("Telegram"), { description = "App: Telegram" })
+--## bind Obsidian
+hl.unbind("SUPER + O")
+hl.bind("SUPER + O", hl.dsp.exec_cmd("obsidian"), { description = "App: Obsidian" })
+--## replace SUPER + P = Window: Pin -> App: Throne
+hl.unbind("SUPER + P")
+hl.bind("SUPER + P", hl.dsp.exec_cmd("throne"), { description = "App: Throne (vpn)" })

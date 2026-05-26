@@ -1,6 +1,12 @@
 xdg-user-dirs
 openssh
 neovim
+nodejs
 npm
+rust
 fd
 ripgrep
+curl
+desktop-file-utils
+mission-center
+gnome-text-editor

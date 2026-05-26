@@ -2,3 +2,6 @@ firefox
 obsidian
 discord
 telegram-desktop
+syncthing
+keepassxc
+kdeconnect
