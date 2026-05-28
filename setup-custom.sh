@@ -29,6 +29,7 @@ run 10-hypr-custom.sh
 run 20-user-dirs.sh
 run 21-greetd-regreet.sh
 run 22-hypr-kdeconnect-fix.sh
+run 23-setup-neovim.sh
 
 if [[ "$WITH_PERSONAL" == true ]]; then
   run 01-packages-personal.sh
