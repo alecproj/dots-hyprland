@@ -4,4 +4,3 @@ discord
 telegram-desktop
 syncthing
 keepassxc
-kdeconnect

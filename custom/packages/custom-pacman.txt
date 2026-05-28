@@ -1,5 +1,6 @@
 xdg-user-dirs
 openssh
+sshfs
 neovim
 nodejs
 npm
@@ -10,3 +11,4 @@ curl
 desktop-file-utils
 mission-center
 gnome-text-editor
+kdeconnect
