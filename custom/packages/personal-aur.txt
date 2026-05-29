@@ -1,3 +1,2 @@
 localsend-bin
-onlyoffice-bin
 rustdesk-bin

@@ -4,3 +4,4 @@ discord
 telegram-desktop
 syncthing
 keepassxc
+libreoffice-fresh
