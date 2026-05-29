@@ -8,4 +8,5 @@ hl.config({
 hl.on("hyprland.start", function()
     hl.exec_cmd("systemctl --user start hypr-kdeconnect-portal.service")
     hl.exec_cmd("kdeconnectd")
+    hl.exec_cmd("sleep 5; ~/.local/bin/throne-autostart")
 end)

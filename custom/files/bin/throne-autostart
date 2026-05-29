@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HYPRCTL="/usr/bin/hyprctl"
+LOG="/tmp/throne-autostart.log"
+
+is_throne_running() {
+  pgrep -x Throne >/dev/null 2>&1 || pgrep -x throne >/dev/null 2>&1
+}
+
+throne_window_exists() {
+  "$HYPRCTL" clients | grep -q "class: Throne"
+}
+
+active_window_is_throne() {
+  "$HYPRCTL" activewindow | grep -q "class: Throne"
+}
+
+hide_throne_window() {
+  "$HYPRCTL" dispatch 'hl.dsp.focus({ window = hl.get_window("class:Throne") })'
+  sleep 0.3
+
+  if active_window_is_throne; then
+    "$HYPRCTL" dispatch 'hl.dsp.window.close()'
+  else
+    echo "Refusing to close: active window is not Throne" >&2
+    return 1
+  fi
+}
+
+if ! is_throne_running; then
+  nohup /usr/bin/throne -tray -flag_restart_tun_on >"$LOG" 2>&1 &
+fi
+
+for _ in {1..80}; do
+  if throne_window_exists; then
+    hide_throne_window
+    exit 0
+  fi
+  sleep 0.25
+done
+
+echo "Throne window was not found after startup" >&2
+exit 1

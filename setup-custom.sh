@@ -30,6 +30,7 @@ run 20-user-dirs.sh
 run 21-greetd-regreet.sh
 run 22-hypr-kdeconnect-fix.sh
 run 23-setup-neovim.sh
+run 24-setup-autostart.sh
 
 if [[ "$WITH_PERSONAL" == true ]]; then
   run 01-packages-personal.sh
