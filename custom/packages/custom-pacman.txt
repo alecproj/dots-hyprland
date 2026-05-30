@@ -12,3 +12,4 @@ desktop-file-utils
 mission-center
 gnome-text-editor
 kdeconnect
+easyeffects

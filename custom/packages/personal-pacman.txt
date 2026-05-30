@@ -5,3 +5,6 @@ telegram-desktop
 syncthing
 keepassxc
 libreoffice-fresh
+feishin
+navidrome
+nicotine+

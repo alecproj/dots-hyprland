@@ -1,0 +1,20 @@
+MusicFolder = '/srv/music'
+DataFolder = '/var/lib/navidrome'
+CacheFolder = '/var/lib/navidrome/cache'
+
+Address = '127.0.0.1'
+Port = 4533
+
+LogLevel = 'info'
+EnableInsightsCollector = false
+
+Agents = 'deezer,listenbrainz'
+ListenBrainz.Enabled = true
+
+Scanner.Enabled = true
+Scanner.ScanOnStartup = true
+Scanner.Schedule = '@every 1h'
+Scanner.WatcherWait = '10s'
+
+PlaylistsPath = 'playlists'
+TranscodingCacheSize = '500MiB'

@@ -34,6 +34,7 @@ run 24-setup-autostart.sh
 
 if [[ "$WITH_PERSONAL" == true ]]; then
   run 01-packages-personal.sh
+  run 25-selfhosted-music.sh
 fi
 
 echo
