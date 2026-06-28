@@ -8,3 +8,5 @@ libreoffice-fresh
 feishin
 navidrome
 nicotine+
+gwenview
+filelight
