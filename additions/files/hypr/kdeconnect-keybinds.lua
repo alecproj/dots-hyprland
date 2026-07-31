@@ -1,0 +1,1 @@
+-- Reserved for KDE Connect managed keybinds.

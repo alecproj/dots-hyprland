@@ -1,0 +1,9 @@
+[Unit]
+Description=Example service placeholder for additions modules
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/true
+
+[Install]
+WantedBy=default.target
