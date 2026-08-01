@@ -36,7 +36,7 @@ MODULE_DESCRIPTION="${MODULE_DESCRIPTION:-}"
 json_quote() {
   local value="$1"
   value="${value//\\/\\\\}"
-  value="${value//"/\\"}"
+  value="${value//\"/\\\"}"
   value="${value//$'\n'/\\n}"
   value="${value//$'\r'/\\r}"
   value="${value//$'\t'/\\t}"
@@ -123,6 +123,8 @@ parse_module_args() {
   POLICY="noconfirm"
   BACKUP="true"
   LANG="en"
+  CONFIRM_DECLINED=false
+  CONFIRM_CONTEXT_SHOWN=false
 
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -156,7 +158,7 @@ parse_module_args() {
     en|ru) ;;
     *) log_error "Invalid lang: $LANG"; exit 2 ;;
   esac
-  export POLICY BACKUP LANG
+  export POLICY BACKUP LANG CONFIRM_DECLINED CONFIRM_CONTEXT_SHOWN
 }
 
 run_status() {
@@ -169,6 +171,14 @@ run_status() {
   exit 5
 }
 
+ensure_action_complete() {
+  local action="$1"
+  if confirmation_was_declined; then
+    log_error "Action incomplete because one or more steps were declined: $MODULE_ID ($action)"
+    return 1
+  fi
+}
+
 run_install() {
   log_info "Starting install: $MODULE_ID"
   install_packages "${MODULE_PACKAGES[@]}"
@@ -176,6 +186,7 @@ run_install() {
   if declare -F install_steps >/dev/null 2>&1; then
     install_steps
   fi
+  ensure_action_complete install
   mark_state "$MODULE_ID" installed install
   log_info "Install completed: $MODULE_ID"
 }
@@ -185,6 +196,7 @@ run_delete() {
   if declare -F delete_steps >/dev/null 2>&1; then
     delete_steps
   fi
+  ensure_action_complete delete
   mark_state "$MODULE_ID" deleted delete
   log_info "Delete completed: $MODULE_ID"
 }
@@ -209,6 +221,8 @@ module_dispatch() {
       ;;
     reinstall)
       run_delete
+      CONFIRM_CONTEXT_SHOWN=false
+      export CONFIRM_CONTEXT_SHOWN
       run_install
       mark_state "$MODULE_ID" installed reinstall
       ;;

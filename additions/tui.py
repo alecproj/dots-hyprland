@@ -9,7 +9,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from registry import ModuleMeta, discover_modules, module_by_id
-from runner import RunOptions, exit_code, print_summary, run_actions
+from runner import (
+    RunOptions,
+    clear_terminal,
+    exit_code,
+    print_summary,
+    run_actions,
+    terminal_failure_prompt,
+)
 
 ACTIONS = ["install", "delete", "reinstall", "skip"]
 ACTION_KEYS = {"install": "I", "delete": "D", "reinstall": "R", "skip": "S"}
@@ -31,13 +38,6 @@ UI = {
         "help": "j/k or arrows: move | Space: cycle | i/d/r/s: action | Enter: details | F10/Ctrl+S: apply | q: quit",
         "empty": "No modules found.",
         "details_hint": "Press any key to close.",
-        "running": "Running selected actions...",
-        "summary": "Summary",
-        "log": "Log",
-        "completed": "Completed",
-        "skipped": "Skipped",
-        "failed": "Failed",
-        "confirm_terminal": "Confirmation prompts use the terminal. Press any key to continue.",
     },
     "ru": {
         "settings": "Настройки:",
@@ -52,13 +52,6 @@ UI = {
         "help": "j/k или стрелки: выбор | Space: сменить | i/d/r/s: действие | Enter: детали | F10/Ctrl+S: применить | q: выход",
         "empty": "Модули не найдены.",
         "details_hint": "Нажми любую клавишу, чтобы закрыть.",
-        "running": "Выполняю выбранные действия...",
-        "summary": "Итог",
-        "log": "Лог",
-        "completed": "Выполнено",
-        "skipped": "Пропущено",
-        "failed": "Ошибки",
-        "confirm_terminal": "Подтверждения будут в терминале. Нажми любую клавишу.",
     },
 }
 
@@ -68,6 +61,12 @@ class Settings:
     policy: str = "noconfirm"
     lang: str = "en"
     backup: str = "true"
+
+
+@dataclass
+class RunRequest:
+    actions: dict[str, str]
+    settings: Settings
 
 
 @dataclass
@@ -86,7 +85,6 @@ class AdditionsTui:
         self.actions = {module.id: module.default_action for module in modules}
         self.cursor = 0
         self.scroll = 0
-        self.summary: Any | None = None
 
     @property
     def text(self) -> dict[str, str]:
@@ -105,19 +103,23 @@ class AdditionsTui:
             Row("blank", ""),
             Row("heading", t["additions"]),
         ]
-        for module in self.modules:
-            if module.section == "additions":
-                rows.append(Row("module", self.module_label(module), module=module))
-        rows.append(Row("blank", ""))
-        rows.append(Row("heading", t["applications:"] if "applications:" in t else t["applications"]))
-        for module in self.modules:
-            if module.section == "applications":
-                rows.append(Row("module", self.module_label(module), module=module))
+        rows.extend(
+            Row("module", self.module_label(module), module=module)
+            for module in self.modules
+            if module.section == "additions"
+        )
+        rows.extend((Row("blank", ""), Row("heading", t["applications"])))
+        rows.extend(
+            Row("module", self.module_label(module), module=module)
+            for module in self.modules
+            if module.section == "applications"
+        )
         if not self.modules:
             rows.append(Row("info", t["empty"]))
         return rows
 
-    def selectable_indexes(self, rows: list[Row]) -> list[int]:
+    @staticmethod
+    def selectable_indexes(rows: list[Row]) -> list[int]:
         return [index for index, row in enumerate(rows) if row.kind in {"button", "toggle", "module"}]
 
     def module_label(self, module: ModuleMeta) -> str:
@@ -133,10 +135,7 @@ class AdditionsTui:
             return
         if self.cursor not in selectable:
             self.cursor = selectable[0]
-        if self.cursor < selectable[0]:
-            self.cursor = selectable[0]
-        if self.cursor > selectable[-1]:
-            self.cursor = selectable[-1]
+        self.cursor = max(selectable[0], min(selectable[-1], self.cursor))
 
     def move(self, delta: int) -> None:
         rows = self.rows()
@@ -146,34 +145,34 @@ class AdditionsTui:
         if self.cursor not in selectable:
             self.cursor = selectable[0]
             return
-        pos = selectable.index(self.cursor)
-        pos = max(0, min(len(selectable) - 1, pos + delta))
-        self.cursor = selectable[pos]
+        position = selectable.index(self.cursor)
+        position = max(0, min(len(selectable) - 1, position + delta))
+        self.cursor = selectable[position]
 
-    def cycle_value(self, current: str, values: list[str], delta: int = 1) -> str:
+    @staticmethod
+    def cycle_value(current: str, values: list[str], delta: int = 1) -> str:
         index = values.index(current)
         return values[(index + delta) % len(values)]
 
-    def activate(self) -> bool:
+    def activate(self) -> None:
         rows = self.rows()
         if not rows or self.cursor >= len(rows):
-            return False
+            return
         row = rows[self.cursor]
         if row.kind == "button":
-            if row.setting == "skip_all":
-                self.set_all("skip")
-            elif row.setting == "install_all":
-                self.set_all("install")
-            elif row.setting == "reinstall_all":
-                self.set_all("reinstall")
-            return False
+            actions = {
+                "skip_all": "skip",
+                "install_all": "install",
+                "reinstall_all": "reinstall",
+            }
+            if row.setting in actions:
+                self.set_all(actions[row.setting])
+            return
         if row.kind == "toggle":
             self.toggle(row.setting or "")
-            return False
+            return
         if row.kind == "module" and row.module:
             self.show_details(row.module)
-            return False
-        return False
 
     def toggle(self, setting: str) -> None:
         if setting == "policy":
@@ -187,24 +186,25 @@ class AdditionsTui:
         for module in self.modules:
             self.actions[module.id] = action
 
-    def set_action(self, action: str) -> None:
+    def current_module(self) -> ModuleMeta | None:
         rows = self.rows()
         if self.cursor >= len(rows):
-            return
+            return None
         row = rows[self.cursor]
-        if row.kind == "module" and row.module:
-            self.actions[row.module.id] = action
+        return row.module if row.kind == "module" else None
+
+    def set_action(self, action: str) -> None:
+        module = self.current_module()
+        if module:
+            self.actions[module.id] = action
 
     def cycle_action(self) -> None:
-        rows = self.rows()
-        if self.cursor >= len(rows):
+        module = self.current_module()
+        if module:
+            current = self.actions.get(module.id, module.default_action)
+            self.actions[module.id] = self.cycle_value(current, ACTIONS)
             return
-        row = rows[self.cursor]
-        if row.kind == "module" and row.module:
-            current = self.actions.get(row.module.id, row.module.default_action)
-            self.actions[row.module.id] = self.cycle_value(current, ACTIONS)
-        elif row.kind in {"button", "toggle"}:
-            self.activate()
+        self.activate()
 
     def draw(self) -> None:
         self.stdscr.erase()
@@ -224,53 +224,38 @@ class AdditionsTui:
                 attr |= curses.A_BOLD
             if index == self.cursor and row.kind in {"button", "toggle", "module"}:
                 attr |= curses.A_REVERSE
-            text = row.label[: max(0, width - 1)]
             try:
-                self.stdscr.addstr(y, 0, text, attr)
+                self.stdscr.addstr(y, 0, row.label[: max(0, width - 1)], attr)
             except curses.error:
                 pass
 
-        help_text = self.text["help"][: max(0, width - 1)]
         try:
-            self.stdscr.addstr(height - 1, 0, help_text, curses.A_DIM)
+            self.stdscr.addstr(height - 1, 0, self.text["help"][: max(0, width - 1)], curses.A_DIM)
         except curses.error:
             pass
         self.stdscr.refresh()
 
     def show_details(self, module: ModuleMeta) -> None:
         height, width = self.stdscr.getmaxyx()
-        win_h = min(height - 2, 18)
-        win_w = min(width - 4, 78)
+        win_h = max(8, min(height - 2, 20))
+        win_w = max(40, min(width - 4, 82))
         y = max(0, (height - win_h) // 2)
         x = max(0, (width - win_w) // 2)
         win = curses.newwin(win_h, win_w, y, x)
         win.box()
-        content = [
-            "Title:",
-            module.title,
-            "",
-            "Description:",
-        ]
+        content = ["Title:", module.title, "", "Description:"]
         content.extend(textwrap.wrap(module.description, max(20, win_w - 4)) or [""])
-        content.append("")
-        content.append("Packages:")
+        content.extend(("", "Packages:"))
         package_text = ", ".join(module.packages) if module.packages else "-"
         if module.aur_packages:
             package_text += f" | AUR: {', '.join(module.aur_packages)}"
-        content.extend(textwrap.wrap(package_text, max(20, win_w - 4)))
-        content.append("")
-        content.append("Files:")
-        if module.files:
-            content.extend(f"- {item}" for item in module.files)
-        else:
-            content.append("-")
-        content.append("")
-        content.append(f"Danger: {module.danger}")
-        content.append(f"Status: {module.status}")
+        content.extend(textwrap.wrap(package_text, max(20, win_w - 4)) or [""])
+        content.extend(("", "Files:"))
+        content.extend((f"- {item}" for item in module.files) if module.files else ["-"])
+        content.extend(("", f"Danger: {module.danger}", f"Status: {module.status}"))
         if module.meta_error:
             content.append(f"Meta error: {module.meta_error}")
-        content.append("")
-        content.append(self.text["details_hint"])
+        content.extend(("", self.text["details_hint"]))
 
         for index, line in enumerate(content[: win_h - 2], start=1):
             try:
@@ -280,85 +265,15 @@ class AdditionsTui:
         win.refresh()
         win.getch()
 
-    def draw_running(self, module_id: str, action: str, status: str) -> None:
-        height, width = self.stdscr.getmaxyx()
-        self.stdscr.erase()
-        lines = [
-            self.text["running"],
-            "",
-            f"{module_id}: {action}",
-            status,
-        ]
-        for index, line in enumerate(lines):
-            if index >= height - 1:
-                break
-            try:
-                self.stdscr.addstr(index, 0, line[: max(0, width - 1)])
-            except curses.error:
-                pass
-        self.stdscr.refresh()
-
-    def apply(self) -> None:
-        options = RunOptions(
+    def request(self) -> RunRequest:
+        settings = Settings(
             policy=self.settings.policy,
-            backup=self.settings.backup,
             lang=self.settings.lang,
-            stop_on_high_failure=True,
-            stream=self.settings.policy != "noconfirm",
+            backup=self.settings.backup,
         )
-        if options.stream:
-            self.show_terminal_notice()
-            curses.def_prog_mode()
-            curses.endwin()
-            self.summary = run_actions(self.modules, self.actions, options, progress=None)
-            print_summary(self.summary)
-            input("\nPress Enter to return to TUI summary...")
-            curses.reset_prog_mode()
-            self.stdscr.refresh()
-        else:
-            self.summary = run_actions(self.modules, self.actions, options, progress=self.draw_running)
-        self.show_summary()
+        return RunRequest(actions=dict(self.actions), settings=settings)
 
-    def show_terminal_notice(self) -> None:
-        height, width = self.stdscr.getmaxyx()
-        self.stdscr.erase()
-        line = self.text["confirm_terminal"][: max(0, width - 1)]
-        try:
-            self.stdscr.addstr(min(2, height - 1), 0, line, curses.A_BOLD)
-        except curses.error:
-            pass
-        self.stdscr.refresh()
-        self.stdscr.getch()
-
-    def show_summary(self) -> None:
-        if not self.summary:
-            return
-        height, width = self.stdscr.getmaxyx()
-        self.stdscr.erase()
-        lines: list[str] = [self.text["summary"], f"{self.text['log']}: {self.summary.log_file}", ""]
-        if self.summary.completed:
-            lines.append(f"{self.text['completed']}:")
-            lines.extend(f"  {item.module_id}: {item.status}" for item in self.summary.completed)
-            lines.append("")
-        if self.summary.skipped:
-            lines.append(f"{self.text['skipped']}:")
-            lines.extend(f"  {item.module_id}" for item in self.summary.skipped)
-            lines.append("")
-        if self.summary.failed:
-            lines.append(f"{self.text['failed']}:")
-            lines.extend(f"  {item.module_id}: {item.message}" for item in self.summary.failed)
-            lines.append("")
-        lines.append(self.text["details_hint"])
-        for index, line in enumerate(lines[: height - 1]):
-            try:
-                attr = curses.A_BOLD if index == 0 else curses.A_NORMAL
-                self.stdscr.addstr(index, 0, line[: max(0, width - 1)], attr)
-            except curses.error:
-                pass
-        self.stdscr.refresh()
-        self.stdscr.getch()
-
-    def run(self) -> None:
+    def run(self) -> RunRequest | None:
         curses.curs_set(0)
         self.stdscr.keypad(True)
         self.clamp_cursor()
@@ -366,7 +281,7 @@ class AdditionsTui:
             self.draw()
             key = self.stdscr.getch()
             if key in (ord("q"), 27):
-                return
+                return None
             if key in (curses.KEY_DOWN, ord("j")):
                 self.move(1)
             elif key in (curses.KEY_UP, ord("k")):
@@ -386,7 +301,7 @@ class AdditionsTui:
             elif key == ord("s"):
                 self.set_action("skip")
             elif key in (curses.KEY_F10, 19):
-                self.apply()
+                return self.request()
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -405,6 +320,18 @@ def parse_module_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def execute(modules: list[ModuleMeta], actions: dict[str, str], options: RunOptions) -> int:
+    clear_terminal()
+    summary = run_actions(
+        modules,
+        actions,
+        options,
+        failure_callback=terminal_failure_prompt,
+    )
+    print_summary(summary)
+    return exit_code(summary)
+
+
 def run_no_tui(args: argparse.Namespace) -> int:
     modules = discover_modules(with_status=False)
     by_id = module_by_id(modules)
@@ -417,19 +344,32 @@ def run_no_tui(args: argparse.Namespace) -> int:
                 return 2
             actions[module_id] = action_name
 
-    options = RunOptions(policy=args.policy, backup=args.backup, lang=args.lang, stream=True)
-    summary = run_actions(modules, actions, options)
-    print_summary(summary)
-    return exit_code(summary)
+    options = RunOptions(
+        policy=args.policy,
+        backup=args.backup,
+        lang=args.lang,
+        selection_confirmed=False,
+    )
+    return execute(modules, actions, options)
 
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     if args.no_tui:
         return run_no_tui(args)
+
     modules = discover_modules(with_status=True)
-    curses.wrapper(lambda stdscr: AdditionsTui(stdscr, modules).run())
-    return 0
+    request = curses.wrapper(lambda stdscr: AdditionsTui(stdscr, modules).run())
+    if request is None:
+        return 0
+
+    options = RunOptions(
+        policy=request.settings.policy,
+        backup=request.settings.backup,
+        lang=request.settings.lang,
+        selection_confirmed=True,
+    )
+    return execute(modules, request.actions, options)
 
 
 if __name__ == "__main__":

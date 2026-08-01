@@ -14,12 +14,6 @@ aur_helper() {
   return 3
 }
 
-_pacman_confirm_args() {
-  if [[ "${POLICY:-noconfirm}" == "noconfirm" || "${POLICY:-noconfirm}" == "confirm-local" ]]; then
-    printf '%s\n' --noconfirm
-  fi
-}
-
 install_packages() {
   local packages=("$@")
   local missing=()
@@ -37,9 +31,9 @@ install_packages() {
     return 0
   fi
 
-  confirm_action all "Install packages: ${missing[*]}" || return 0
+  confirm_action packages "Install packages: ${missing[*]}" || return 0
   log_info "Installing packages: ${missing[*]}"
-  sudo pacman -S --needed $(_pacman_confirm_args) "${missing[@]}"
+  sudo pacman -S --needed --noconfirm "${missing[@]}"
 }
 
 install_aur_packages() {
@@ -64,9 +58,9 @@ install_aur_packages() {
     exit 3
   }
 
-  confirm_action all "Install AUR packages with $helper: ${missing[*]}" || return 0
+  confirm_action packages "Install AUR packages with $helper: ${missing[*]}" || return 0
   log_info "Installing AUR packages with $helper: ${missing[*]}"
-  "$helper" -S --needed $(_pacman_confirm_args) "${missing[@]}"
+  "$helper" -S --needed --noconfirm "${missing[@]}"
 }
 
 remove_packages() {
@@ -86,7 +80,7 @@ remove_packages() {
     return 0
   fi
 
-  confirm_action all "Remove packages: ${installed[*]}" || return 0
+  confirm_action packages "Remove packages: ${installed[*]}" || return 0
   log_info "Removing packages: ${installed[*]}"
-  sudo pacman -Rns $(_pacman_confirm_args) "${installed[@]}"
+  sudo pacman -Rns --noconfirm "${installed[@]}"
 }

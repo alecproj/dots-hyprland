@@ -22,12 +22,12 @@ backup_file() {
   fi
 
   local stamp backup_dir backup_name
-  stamp="$(date +%Y-%m-%d_%H-%M-%S)"
+  stamp="$(date +%Y-%m-%d_%H-%M-%S_%N)"
   backup_dir="${ADDITIONS_STATE_DIR:-$HOME/.local/state/dots-hyprland-additions}/backups/$module_id/$stamp"
   backup_name="$(backup_target_name "$target")"
-  mkdir -p "$backup_dir"
 
-  confirm_action local "Backup $target" || return 0
+  confirm_action local "Backup $target" || return 1
+  mkdir -p "$backup_dir"
   log_info "Backup $target -> $backup_dir/$backup_name"
   if [[ -w "$target" && -r "$target" ]]; then
     cp -a "$target" "$backup_dir/$backup_name"

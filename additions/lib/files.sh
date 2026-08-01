@@ -16,7 +16,7 @@ install_file_sudo() {
     return 0
   fi
 
-  backup_file "$MODULE_ID" "$target"
+  backup_file "$MODULE_ID" "$target" || return 0
   confirm_action local "Write $target" || return 0
   log_info "Installing file $source -> $target"
   sudo install -Dm"$mode" "$source" "$target"
@@ -37,7 +37,7 @@ install_file_user() {
     return 0
   fi
 
-  backup_file "$MODULE_ID" "$target"
+  backup_file "$MODULE_ID" "$target" || return 0
   confirm_action local "Write $target" || return 0
   log_info "Installing file $source -> $target"
   install -Dm"$mode" "$source" "$target"

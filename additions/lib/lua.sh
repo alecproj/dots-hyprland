@@ -13,9 +13,6 @@ lua_block() {
   local content="$3"
   local tmp new_file
 
-  mkdir -p "$(dirname "$file")"
-  [[ -f "$file" ]] || : >"$file"
-
   tmp="$(mktemp)"
   new_file="$(mktemp)"
   printf '%s\n' "$content" >"$tmp"
@@ -56,13 +53,16 @@ if not found:
 print("".join(out), end="")
 PY
 
-  if cmp -s "$file" "$new_file"; then
+  if [[ -f "$file" ]] && cmp -s "$file" "$new_file"; then
     log_info "Lua block already up to date: $file ($module_id)"
     rm -f "$tmp" "$new_file"
     return 0
   fi
 
-  backup_file "$MODULE_ID" "$file"
+  backup_file "$MODULE_ID" "$file" || {
+    rm -f "$tmp" "$new_file"
+    return 0
+  }
   confirm_action local "Edit Lua block $module_id in $file" || {
     rm -f "$tmp" "$new_file"
     return 0
@@ -110,7 +110,10 @@ PY
     return 0
   fi
 
-  backup_file "$MODULE_ID" "$file"
+  backup_file "$MODULE_ID" "$file" || {
+    rm -f "$new_file"
+    return 0
+  }
   confirm_action local "Remove Lua block $module_id from $file" || {
     rm -f "$new_file"
     return 0
