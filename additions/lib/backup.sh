@@ -26,7 +26,7 @@ backup_file() {
   backup_dir="${ADDITIONS_STATE_DIR:-$HOME/.local/state/dots-hyprland-additions}/backups/$module_id/$stamp"
   backup_name="$(backup_target_name "$target")"
 
-  confirm_action local "Backup $target" || return 1
+  confirm_action local "Back up $target" "Создать резервную копию $target" || return 1
   mkdir -p "$backup_dir"
   log_info "Backup $target -> $backup_dir/$backup_name"
   if [[ -w "$target" && -r "$target" ]]; then
@@ -53,14 +53,20 @@ restore_backup_or_remove() {
   backup="$(latest_backup_for "$module_id" "$target")"
 
   if [[ -n "$backup" && -f "$backup" ]]; then
-    confirm_action local "Restore backup for $target" || return 0
+    confirm_action \
+      local \
+      "Restore backup for $target" \
+      "Восстановить резервную копию $target" || return 0
     log_info "Restoring backup $backup -> $target"
     sudo install -Dm644 "$backup" "$target"
     return 0
   fi
 
   if [[ -e "$target" ]]; then
-    confirm_action local "Remove managed file $target" || return 0
+    confirm_action \
+      local \
+      "Remove managed file $target" \
+      "Удалить управляемый файл $target" || return 0
     log_info "Removing managed file $target"
     sudo rm -f "$target"
   fi

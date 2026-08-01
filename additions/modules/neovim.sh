@@ -4,7 +4,9 @@ set -euo pipefail
 MODULE_ID="neovim"
 MODULE_SECTION="additions"
 MODULE_TITLE="Setup Neovim Editor"
+MODULE_TITLE_RU="Настройка редактора Neovim"
 MODULE_DESCRIPTION="Installs Neovim and common dependencies. This first-stage module does not replace an existing Neovim configuration; config migration should be added as a separate managed file or block."
+MODULE_DESCRIPTION_RU="Устанавливает Neovim и основные зависимости. Модуль первого этапа не заменяет существующую конфигурацию Neovim; её перенос следует реализовать отдельным управляемым файлом или блоком."
 MODULE_DANGER="medium"
 MODULE_DEFAULT_ACTION="skip"
 MODULE_PACKAGES=(neovim git ripgrep fd unzip npm tree-sitter-cli)
@@ -15,7 +17,7 @@ install_steps() {
 }
 
 delete_steps() {
-  log_info "Neovim delete removes packages only. User config is preserved."
+  log_info "Neovim delete removes the editor package only. User config is preserved."
   remove_packages neovim
 }
 

@@ -3,7 +3,6 @@ set -euo pipefail
 
 POLICY="${POLICY:-noconfirm}"
 CONFIRM_DECLINED="${CONFIRM_DECLINED:-false}"
-CONFIRM_CONTEXT_SHOWN="${CONFIRM_CONTEXT_SHOWN:-false}"
 
 _effective_policy() {
   local state_file="${ADDITIONS_CONFIRM_STATE_FILE:-}"
@@ -61,87 +60,83 @@ _confirm_needed() {
   esac
 }
 
-_print_box_line() {
-  local text="$1"
-  printf '| %-74.74s |\n' "$text" >&9
+_confirm_color_enabled() {
+  [[ -t 9 ]] && [[ -z "${NO_COLOR:-}" ]] && [[ "${TERM:-}" != "dumb" ]]
 }
 
-_print_wrapped_box_line() {
-  local label="$1"
-  local value="$2"
-  local first=true
-  local line
-
-  while IFS= read -r line; do
-    if [[ "$first" == true ]]; then
-      _print_box_line "$label: $line"
-      first=false
-    else
-      _print_box_line "  $line"
-    fi
-  done < <(printf '%s\n' "$value" | fold -s -w 70)
-}
-
-_print_confirmation_context() {
-  local language="${LANG:-en}"
-  local module_label="Module"
-  local action_label="Action"
-  local danger_label="Danger"
-  local description_label="Description"
-
-  if [[ "$language" == "ru" ]]; then
-    module_label="Модуль"
-    action_label="Действие"
-    danger_label="Опасность"
-    description_label="Описание"
+_confirm_paint() {
+  local code="$1"
+  local text="$2"
+  if _confirm_color_enabled; then
+    printf '\033[%sm%s\033[0m' "$code" "$text"
+  else
+    printf '%s' "$text"
   fi
-
-  printf '%s\n' '+----------------------------------------------------------------------------+' >&9
-  _print_wrapped_box_line "$module_label" "${MODULE_TITLE:-${MODULE_ID:-unknown}} [${MODULE_ID:-unknown}]"
-  _print_wrapped_box_line "$action_label" "${COMMAND:-unknown}"
-  _print_wrapped_box_line "$danger_label" "${MODULE_DANGER:-medium}"
-  _print_wrapped_box_line "$description_label" "${MODULE_DESCRIPTION:-No description provided.}"
-  printf '%s\n' '+----------------------------------------------------------------------------+' >&9
-  CONFIRM_CONTEXT_SHOWN=true
-  export CONFIRM_CONTEXT_SHOWN
 }
 
-_print_confirmation_action() {
+_localized_confirmation_message() {
+  local message_en="$1"
+  local message_ru="${2:-}"
+  if [[ "${ADDITIONS_LANG:-en}" == "ru" && -n "$message_ru" ]]; then
+    printf '%s\n' "$message_ru"
+  else
+    printf '%s\n' "$message_en"
+  fi
+}
+
+_print_confirmation_prompt() {
   local message="$1"
-  local prompt="Proceed? [y]es / [n]o / [a]ll / [q]uit: "
+  local prompt invalid_context
 
-  if [[ "${LANG:-en}" == "ru" ]]; then
-    prompt="Продолжить? [y] да / [n] нет / [a] да для всех / [q] выход: "
+  if [[ "${ADDITIONS_LANG:-en}" == "ru" ]]; then
+    prompt="[y] да  [n] нет  [a] да для всех  [q] выход: "
+    invalid_context="Введите y, n, a или q."
+  else
+    prompt="[y] yes  [n] no  [a] yes to all  [q] quit: "
+    invalid_context="Enter y, n, a or q."
   fi
 
-  _print_wrapped_box_line "Step" "$message"
-  printf '%s\n' '+----------------------------------------------------------------------------+' >&9
-  printf '%s' "$prompt" >&9
+  printf '\n' >&9
+  _confirm_paint '1;33' '?' >&9
+  printf ' ' >&9
+  if [[ "${ADDITIONS_RUNNER_CONTEXT:-0}" != "1" ]]; then
+    local module_title="${MODULE_TITLE:-${MODULE_ID:-module}}"
+    if [[ "${ADDITIONS_LANG:-en}" == "ru" && -n "${MODULE_TITLE_RU:-}" ]]; then
+      module_title="$MODULE_TITLE_RU"
+    fi
+    _confirm_paint '1;36' "$module_title" >&9
+    printf ' — ' >&9
+  fi
+  printf '%s\n' "$message" >&9
+  printf '  ' >&9
+  _confirm_paint '1' "$prompt" >&9
+
+  CONFIRM_INVALID_MESSAGE="$invalid_context"
 }
 
 confirm_action() {
   local scope="$1"
-  local message="$2"
-  local answer
+  local message_en="$2"
+  local message_ru="${3:-}"
+  local message answer
 
   if ! _confirm_needed "$scope"; then
     return 0
   fi
 
+  message="$(_localized_confirmation_message "$message_en" "$message_ru")"
+
   if ! exec 9<>/dev/tty 2>/dev/null; then
-    log_error "Cannot ask for confirmation without a controlling terminal: $message"
+    log_error "Cannot ask for confirmation without a controlling terminal: $message_en"
     exit 4
   fi
 
   while true; do
-    if [[ "$CONFIRM_CONTEXT_SHOWN" != "true" ]]; then
-      _print_confirmation_context
-    fi
-    _print_confirmation_action "$message"
+    _print_confirmation_prompt "$message"
 
     if ! IFS= read -r answer <&9; then
       exec 9>&-
-      log_error "Confirmation input closed: $message"
+      log_error "Confirmation input closed: $message_en"
       exit 4
     fi
 
@@ -154,7 +149,7 @@ confirm_action() {
         CONFIRM_DECLINED=true
         export CONFIRM_DECLINED
         exec 9>&-
-        log_warn "Declined by user: $message"
+        log_warn "Declined by user: $message_en"
         return 1
         ;;
       a|A|all|ALL|все|ВСЕ)
@@ -165,11 +160,11 @@ confirm_action() {
         ;;
       q|Q|quit|QUIT|в|В|выход|ВЫХОД)
         exec 9>&-
-        log_error "Cancelled by user: $message"
+        log_error "Cancelled by user: $message_en"
         exit 4
         ;;
       *)
-        printf '%s\n' "Please enter y, n, a or q." >&9
+        printf '  %s\n' "$CONFIRM_INVALID_MESSAGE" >&9
         ;;
     esac
   done

@@ -31,7 +31,10 @@ install_packages() {
     return 0
   fi
 
-  confirm_action packages "Install packages: ${missing[*]}" || return 0
+  confirm_action \
+    packages \
+    "Install packages: ${missing[*]}" \
+    "Установить пакеты: ${missing[*]}" || return 0
   log_info "Installing packages: ${missing[*]}"
   sudo pacman -S --needed --noconfirm "${missing[@]}"
 }
@@ -58,7 +61,10 @@ install_aur_packages() {
     exit 3
   }
 
-  confirm_action packages "Install AUR packages with $helper: ${missing[*]}" || return 0
+  confirm_action \
+    packages \
+    "Install AUR packages with $helper: ${missing[*]}" \
+    "Установить AUR-пакеты через $helper: ${missing[*]}" || return 0
   log_info "Installing AUR packages with $helper: ${missing[*]}"
   "$helper" -S --needed --noconfirm "${missing[@]}"
 }
@@ -80,7 +86,10 @@ remove_packages() {
     return 0
   fi
 
-  confirm_action packages "Remove packages: ${installed[*]}" || return 0
+  confirm_action \
+    packages \
+    "Remove packages: ${installed[*]}" \
+    "Удалить пакеты: ${installed[*]}" || return 0
   log_info "Removing packages: ${installed[*]}"
   sudo pacman -Rns --noconfirm "${installed[@]}"
 }

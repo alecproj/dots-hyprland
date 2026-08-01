@@ -32,6 +32,8 @@ MODULE_SECTION="${MODULE_SECTION:-additions}"
 MODULE_DANGER="${MODULE_DANGER:-medium}"
 MODULE_DEFAULT_ACTION="${MODULE_DEFAULT_ACTION:-skip}"
 MODULE_DESCRIPTION="${MODULE_DESCRIPTION:-}"
+MODULE_TITLE_RU="${MODULE_TITLE_RU:-}"
+MODULE_DESCRIPTION_RU="${MODULE_DESCRIPTION_RU:-}"
 
 json_quote() {
   local value="$1"
@@ -58,6 +60,19 @@ json_array() {
   printf ']'
 }
 
+json_localized() {
+  local english="$1"
+  local russian="${2:-}"
+
+  printf '{"en": '
+  json_quote "$english"
+  if [[ -n "$russian" ]]; then
+    printf ', "ru": '
+    json_quote "$russian"
+  fi
+  printf '}'
+}
+
 module_meta() {
   cat <<JSON
 {
@@ -65,6 +80,8 @@ module_meta() {
   "section": $(json_quote "$MODULE_SECTION"),
   "title": $(json_quote "$MODULE_TITLE"),
   "description": $(json_quote "$MODULE_DESCRIPTION"),
+  "title_i18n": $(json_localized "$MODULE_TITLE" "$MODULE_TITLE_RU"),
+  "description_i18n": $(json_localized "$MODULE_DESCRIPTION" "$MODULE_DESCRIPTION_RU"),
   "packages": $(json_array "${MODULE_PACKAGES[@]}"),
   "aur_packages": $(json_array "${MODULE_AUR_PACKAGES[@]}"),
   "files": $(json_array "${MODULE_FILES[@]}"),
@@ -122,9 +139,8 @@ parse_module_args() {
 
   POLICY="noconfirm"
   BACKUP="true"
-  LANG="en"
+  ADDITIONS_LANG="en"
   CONFIRM_DECLINED=false
-  CONFIRM_CONTEXT_SHOWN=false
 
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -135,7 +151,7 @@ parse_module_args() {
         BACKUP="${1#--backup=}"
         ;;
       --lang=*)
-        LANG="${1#--lang=}"
+        ADDITIONS_LANG="${1#--lang=}"
         ;;
       *)
         log_error "Unknown argument: $1"
@@ -154,11 +170,12 @@ parse_module_args() {
     true|false) ;;
     *) log_error "Invalid backup value: $BACKUP"; exit 2 ;;
   esac
-  case "$LANG" in
+  case "$ADDITIONS_LANG" in
     en|ru) ;;
-    *) log_error "Invalid lang: $LANG"; exit 2 ;;
+    *) log_error "Invalid lang: $ADDITIONS_LANG"; exit 2 ;;
   esac
-  export POLICY BACKUP LANG CONFIRM_DECLINED CONFIRM_CONTEXT_SHOWN
+  MODULE_LANG="$ADDITIONS_LANG"
+  export POLICY BACKUP ADDITIONS_LANG MODULE_LANG CONFIRM_DECLINED
 }
 
 run_status() {
@@ -221,8 +238,6 @@ module_dispatch() {
       ;;
     reinstall)
       run_delete
-      CONFIRM_CONTEXT_SHOWN=false
-      export CONFIRM_CONTEXT_SHOWN
       run_install
       mark_state "$MODULE_ID" installed reinstall
       ;;

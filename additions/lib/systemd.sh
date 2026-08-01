@@ -27,7 +27,7 @@ enable_service() {
     log_info "Service already enabled: $unit"
     return 0
   fi
-  confirm_action local "Enable $unit" || return 0
+  confirm_action local "Enable $unit" "Включить $unit" || return 0
   log_info "Enabling service: $unit"
   sudo systemctl enable "$unit"
 }
@@ -43,7 +43,7 @@ disable_service_if_exists() {
     log_info "Service already disabled: $unit"
     return 0
   fi
-  confirm_action local "Disable $unit" || return 0
+  confirm_action local "Disable $unit" "Отключить $unit" || return 0
   log_info "Disabling service: $unit"
   sudo systemctl disable --now "$unit" 2>/dev/null || sudo systemctl disable "$unit"
 }

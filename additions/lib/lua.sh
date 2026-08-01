@@ -63,7 +63,10 @@ PY
     rm -f "$tmp" "$new_file"
     return 0
   }
-  confirm_action local "Edit Lua block $module_id in $file" || {
+  confirm_action \
+    local \
+    "Update Lua block $module_id in $file" \
+    "Обновить Lua-блок $module_id в $file" || {
     rm -f "$tmp" "$new_file"
     return 0
   }
@@ -114,7 +117,10 @@ PY
     rm -f "$new_file"
     return 0
   }
-  confirm_action local "Remove Lua block $module_id from $file" || {
+  confirm_action \
+    local \
+    "Remove Lua block $module_id from $file" \
+    "Удалить Lua-блок $module_id из $file" || {
     rm -f "$new_file"
     return 0
   }

@@ -4,7 +4,9 @@ set -euo pipefail
 MODULE_ID="greetd-regreet"
 MODULE_SECTION="additions"
 MODULE_TITLE="Setup Greetd Login Manager"
+MODULE_TITLE_RU="Настройка дисплейного менеджера Greetd"
 MODULE_DESCRIPTION="Installs greetd, greetd-regreet and cage. Writes /etc/greetd/config.toml and /etc/greetd/regreet.toml with backup. Disables conflicting display managers and enables greetd.service."
+MODULE_DESCRIPTION_RU="Устанавливает greetd, greetd-regreet и cage. С резервным копированием записывает /etc/greetd/config.toml и /etc/greetd/regreet.toml, отключает конфликтующие дисплейные менеджеры и включает greetd.service."
 MODULE_DANGER="high"
 MODULE_DEFAULT_ACTION="skip"
 MODULE_PACKAGES=(greetd greetd-regreet cage)

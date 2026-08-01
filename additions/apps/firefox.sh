@@ -4,7 +4,9 @@ set -euo pipefail
 MODULE_ID="firefox"
 MODULE_SECTION="applications"
 MODULE_TITLE="Firefox Browser"
+MODULE_TITLE_RU="Браузер Firefox"
 MODULE_DESCRIPTION="Installs Firefox browser from official Arch repositories."
+MODULE_DESCRIPTION_RU="Устанавливает браузер Firefox из официальных репозиториев Arch Linux."
 MODULE_DANGER="low"
 MODULE_DEFAULT_ACTION="skip"
 MODULE_PACKAGES=(firefox)
