@@ -1,6 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# @api
+# kind: command
+# name: setup-additions
+# signature: ./additions/setup-additions
+# summary: Open the interactive curses selector and execute the returned run request after curses exits.
+# @end
+# @api
+# kind: command
+# name: no-tui
+# signature: ./additions/setup-additions --no-tui --install|--delete|--reinstall MODULE_ID[,MODULE_ID...] [OPTIONS]
+# summary: Execute selected module actions without opening curses.
+# @end
+# @api
+# kind: command
+# name: print-api
+# signature: ./additions/setup-additions --print-api [markdown|json] [--api-output PATH]
+# summary: Auto-generate the complete module API, current module metadata, template and validation report.
+# @end
+# @api
+# kind: command
+# name: check-api
+# signature: ./additions/setup-additions --check-api
+# summary: Validate API documentation, shell function collisions, module IDs, callbacks, metadata and Bash syntax.
+# @end
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"

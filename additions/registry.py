@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from collections import Counter
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -14,7 +15,11 @@ ADDITIONS_DIR = ROOT / "additions"
 BUILTIN_SECTIONS = ("additions", "applications")
 VALID_DANGER = {"low", "medium", "high"}
 VALID_ACTIONS = {"install", "delete", "reinstall", "skip"}
+RUNTIME_ACTIONS = {"install", "delete", "reinstall"}
 SECTION_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+ID_PATTERN = SECTION_PATTERN
+META_TIMEOUT_SECONDS = 5
+STATUS_TIMEOUT_SECONDS = 10
 
 
 def _translation_map(value: Any, field: str) -> dict[str, str]:
@@ -31,6 +36,22 @@ def _translation_map(value: Any, field: str) -> dict[str, str]:
     return result
 
 
+def _string_tuple(value: Any, field: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ValueError(f"invalid list field: {field}")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"invalid list entry: {field}")
+        text = item.strip()
+        if text in result:
+            raise ValueError(f"duplicate list entry in {field}: {text}")
+        result.append(text)
+    return tuple(result)
+
+
 @dataclass(frozen=True)
 class ModuleMeta:
     id: str
@@ -41,7 +62,12 @@ class ModuleMeta:
     path: Path
     packages: tuple[str, ...] = ()
     aur_packages: tuple[str, ...] = ()
+    required_commands: tuple[str, ...] = ()
     files: tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
+    supported_actions: tuple[str, ...] = ("install", "delete", "reinstall")
+    version: str = "1"
+    verify: bool = True
     danger: str = "medium"
     status: str = "unknown"
     meta_error: str | None = None
@@ -55,11 +81,17 @@ class ModuleMeta:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"missing or invalid meta field: {field}")
 
+        module_id = data["id"].strip()
+        if not ID_PATTERN.fullmatch(module_id):
+            raise ValueError(f"invalid id: {module_id}")
+        if path.stem != module_id:
+            raise ValueError(f"module id must match filename: {module_id} != {path.stem}")
+
         section = data["section"].strip()
         if not SECTION_PATTERN.fullmatch(section):
             raise ValueError(f"invalid section: {section}")
 
-        default_action = data["default_action"]
+        default_action = data["default_action"].strip()
         if default_action not in VALID_ACTIONS:
             raise ValueError(f"invalid default_action: {default_action}")
 
@@ -67,22 +99,44 @@ class ModuleMeta:
         if danger not in VALID_DANGER:
             raise ValueError(f"invalid danger: {danger}")
 
-        title_i18n = _translation_map(data.get("title_i18n"), "title_i18n")
-        description_i18n = _translation_map(data.get("description_i18n"), "description_i18n")
+        supported_actions = _string_tuple(
+            data.get("supported_actions", ["install", "delete", "reinstall"]),
+            "supported_actions",
+        )
+        if not supported_actions:
+            raise ValueError("supported_actions must not be empty")
+        invalid_actions = set(supported_actions) - RUNTIME_ACTIONS
+        if invalid_actions:
+            raise ValueError(f"invalid supported action(s): {', '.join(sorted(invalid_actions))}")
+        if default_action != "skip" and default_action not in supported_actions:
+            raise ValueError("default_action is not listed in supported_actions")
+
+        verify = data.get("verify", True)
+        if not isinstance(verify, bool):
+            raise ValueError("verify must be boolean")
+
+        version = data.get("version", "1")
+        if not isinstance(version, str) or not version.strip():
+            raise ValueError("version must be a non-empty string")
 
         return cls(
-            id=data["id"].strip(),
+            id=module_id,
             section=section,
             title=data["title"].strip(),
             description=data["description"].strip(),
             default_action=default_action,
-            danger=danger,
-            packages=tuple(str(item) for item in data.get("packages", []) if str(item)),
-            aur_packages=tuple(str(item) for item in data.get("aur_packages", []) if str(item)),
-            files=tuple(str(item) for item in data.get("files", []) if str(item)),
             path=path,
-            title_i18n=title_i18n,
-            description_i18n=description_i18n,
+            packages=_string_tuple(data.get("packages", []), "packages"),
+            aur_packages=_string_tuple(data.get("aur_packages", []), "aur_packages"),
+            required_commands=_string_tuple(data.get("required_commands", []), "required_commands"),
+            files=_string_tuple(data.get("files", []), "files"),
+            tags=_string_tuple(data.get("tags", []), "tags"),
+            supported_actions=supported_actions,
+            version=version.strip(),
+            verify=verify,
+            danger=danger,
+            title_i18n=_translation_map(data.get("title_i18n"), "title_i18n"),
+            description_i18n=_translation_map(data.get("description_i18n"), "description_i18n"),
         )
 
     def title_for(self, lang: str) -> str:
@@ -93,17 +147,28 @@ class ModuleMeta:
         language = normalize_lang(lang)
         return (self.description_i18n or {}).get(language, self.description)
 
+    def actions_with_skip(self) -> tuple[str, ...]:
+        return (*self.supported_actions, "skip")
+
+
+def _run_script(path: Path, command: str, timeout: int) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            [str(path), command],
+            cwd=str(ROOT),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            errors="replace",
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"{command} timed out after {timeout}s: {path}") from exc
+
 
 def _meta_from_script(path: Path) -> ModuleMeta:
-    result = subprocess.run(
-        [str(path), "meta"],
-        cwd=str(ROOT),
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        errors="replace",
-        check=False,
-    )
+    result = _run_script(path, "meta", META_TIMEOUT_SECONDS)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"meta failed: {path}")
     try:
@@ -138,19 +203,24 @@ def discover_modules(with_status: bool = True) -> list[ModuleMeta]:
                         meta_error=str(exc),
                     )
                 )
+
+    counts = Counter(module.id for module in modules)
+    duplicate_ids = {module_id for module_id, count in counts.items() if count > 1}
+    if duplicate_ids:
+        modules = [
+            replace(module, status="error", meta_error=f"duplicate module id: {module.id}")
+            if module.id in duplicate_ids
+            else module
+            for module in modules
+        ]
     return modules
 
 
 def meta_with_status(meta: ModuleMeta) -> ModuleMeta:
-    result = subprocess.run(
-        [str(meta.path), "status"],
-        cwd=str(ROOT),
-        text=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        errors="replace",
-        check=False,
-    )
+    try:
+        result = _run_script(meta.path, "status", STATUS_TIMEOUT_SECONDS)
+    except RuntimeError:
+        return replace(meta, status="unknown")
     if result.returncode == 0:
         status = "installed"
     elif result.returncode == 5:
@@ -161,4 +231,9 @@ def meta_with_status(meta: ModuleMeta) -> ModuleMeta:
 
 
 def module_by_id(modules: list[ModuleMeta]) -> dict[str, ModuleMeta]:
-    return {module.id: module for module in modules}
+    result: dict[str, ModuleMeta] = {}
+    for module in modules:
+        if module.id in result:
+            raise ValueError(f"duplicate module id: {module.id}")
+        result[module.id] = module
+    return result

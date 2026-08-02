@@ -322,6 +322,23 @@ def run_actions(
             if options.terminal_output:
                 print_module_header(module, action, options.lang, selected_index, len(selected_modules))
 
+            if action not in module.supported_actions:
+                message = f"unsupported action: {action}"
+                result = _make_result(module, action, False, "failed", message, 2, options.lang)
+                failed.append(result)
+                mark_module(module.id, "failed", action, success=False, error=message)
+                if options.terminal_output:
+                    _print_result(module, result, options.lang)
+                if progress:
+                    progress(module.id, action, "failed")
+                decision = "continue"
+                if failure_callback:
+                    decision = failure_callback(module, result, log_file, options.lang)
+                if decision != "continue":
+                    stopped = True
+                    break
+                continue
+
             if module.meta_error:
                 result = _make_result(module, action, False, "failed", module.meta_error, 1, options.lang)
                 failed.append(result)

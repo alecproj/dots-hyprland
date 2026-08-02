@@ -15,6 +15,7 @@ from i18n import (
     status_text,
     tr,
 )
+from module_api import check_api, emit_api
 from registry import BUILTIN_SECTIONS, ModuleMeta, discover_modules, module_by_id
 from runner import (
     RunOptions,
@@ -339,18 +340,20 @@ class AdditionsTui:
 
     def set_all(self, action: str) -> None:
         for module in self.modules:
-            self.actions[module.id] = action
+            if action == "skip" or action in module.supported_actions:
+                self.actions[module.id] = action
 
     def set_action(self, action: str) -> None:
         module = self.current_module()
-        if module:
+        if module and (action == "skip" or action in module.supported_actions):
             self.actions[module.id] = action
 
     def cycle_action(self) -> str | None:
         module = self.current_module()
         if module:
             current = self.actions.get(module.id, module.default_action)
-            self.actions[module.id] = self.cycle_value(current, ACTIONS)
+            available = list(module.actions_with_skip())
+            self.actions[module.id] = self.cycle_value(current, available)
             return None
         return self.activate()
 
@@ -651,6 +654,25 @@ class AdditionsTui:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="dots-hyprland additions setup")
+    api_group = parser.add_mutually_exclusive_group()
+    api_group.add_argument(
+        "--print-api",
+        nargs="?",
+        const="markdown",
+        choices=("markdown", "json"),
+        metavar="FORMAT",
+        help="print the auto-generated module API as markdown or json",
+    )
+    api_group.add_argument(
+        "--check-api",
+        action="store_true",
+        help="validate lib documentation, shell function collisions and module contracts",
+    )
+    parser.add_argument(
+        "--api-output",
+        metavar="PATH",
+        help="write --print-api output to PATH instead of stdout",
+    )
     parser.add_argument("--no-tui", action="store_true")
     parser.add_argument("--install", default="")
     parser.add_argument("--delete", default="")
@@ -687,6 +709,13 @@ def run_no_tui(args: argparse.Namespace) -> int:
             if module_id not in by_id:
                 print(tr(args.lang, "unknown_module", module_id=module_id), file=sys.stderr)
                 return 2
+            module = by_id[module_id]
+            if action_name not in module.supported_actions:
+                print(
+                    tr(args.lang, "unsupported_action", action=action_name, module_id=module_id),
+                    file=sys.stderr,
+                )
+                return 2
             actions[module_id] = action_name
 
     options = RunOptions(
@@ -700,6 +729,13 @@ def run_no_tui(args: argparse.Namespace) -> int:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
+    if args.api_output and not args.print_api:
+        print("--api-output requires --print-api", file=sys.stderr)
+        return 2
+    if args.print_api:
+        return emit_api(args.print_api, args.api_output)
+    if args.check_api:
+        return check_api()
     if args.no_tui:
         return run_no_tui(args)
 

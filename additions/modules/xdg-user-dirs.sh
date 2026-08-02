@@ -7,13 +7,15 @@ MODULE_TITLE="Setup xdg-user-dirs"
 MODULE_TITLE_RU="Настройка xdg-user-dirs"
 MODULE_DESCRIPTION="Installs xdg-user-dirs and runs xdg-user-dirs-update. Existing user directory definitions are kept unless xdg-user-dirs itself decides an update is needed."
 MODULE_DESCRIPTION_RU="Устанавливает xdg-user-dirs и запускает xdg-user-dirs-update. Существующие определения пользовательских каталогов сохраняются, если самому xdg-user-dirs не требуется их обновить."
+MODULE_VERSION="1"
 MODULE_DANGER="low"
 MODULE_DEFAULT_ACTION="skip"
 MODULE_PACKAGES=(xdg-user-dirs)
+MODULE_REQUIRED_COMMANDS=(xdg-user-dirs-update)
+MODULE_TAGS=(xdg directories desktop)
 
 install_steps() {
-  log_info "Running xdg-user-dirs-update"
-  xdg-user-dirs-update
+  run_logged xdg-user-dirs-update
 }
 
 delete_steps() {
@@ -22,7 +24,8 @@ delete_steps() {
 }
 
 status_steps() {
-  command -v xdg-user-dirs-update >/dev/null 2>&1
+  command_exists xdg-user-dirs-update && return 0
+  return 5
 }
 
 source "$(dirname "$0")/../lib/module.sh"
