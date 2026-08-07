@@ -58,7 +58,7 @@ install_packages() {
   local packages=("$@")
   local missing=()
   local package
-  [[ "${#packages[@]}" -gt 0 ]] || return 1
+  [[ "${#packages[@]}" -gt 0 ]] || return 0
   require_command pacman "install the Arch package manager"
 
   for package in "${packages[@]}"; do
@@ -91,7 +91,7 @@ install_aur_packages() {
   local packages=("$@")
   local missing=()
   local package helper
-  [[ "${#packages[@]}" -gt 0 ]] || return 1
+  [[ "${#packages[@]}" -gt 0 ]] || return 0
 
   for package in "${packages[@]}"; do
     [[ -n "$package" ]] || continue

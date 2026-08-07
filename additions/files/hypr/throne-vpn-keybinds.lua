@@ -1,5 +1,4 @@
 -- Throne VPN keybinds
--- Requires illogical-impulse Lua helpers to expose bind() and hl.spawn().
-bind("SUPER", "V", function()
-  hl.spawn("throne")
-end)
+-- replace SUPER + P = Window: Pin -> App: Throne
+hl.unbind("SUPER + P")
+hl.bind("SUPER + P", hl.dsp.exec_cmd("throne"), { description = "App: Throne (vpn)" })

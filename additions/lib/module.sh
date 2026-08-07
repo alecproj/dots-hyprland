@@ -12,6 +12,8 @@ source "$ROOT/additions/lib/confirm.sh"
 source "$ROOT/additions/lib/state.sh"
 # shellcheck source=additions/lib/commands.sh
 source "$ROOT/additions/lib/commands.sh"
+# shellcheck source=additions/lib/git.sh
+source "$ROOT/additions/lib/git.sh"
 # shellcheck source=additions/lib/backup.sh
 source "$ROOT/additions/lib/backup.sh"
 # shellcheck source=additions/lib/files.sh
@@ -344,7 +346,7 @@ _module_install_body() {
   install_aur_packages "${MODULE_AUR_PACKAGES[@]}"
   _module_require_commands
   install_steps
-  _confirm_was_declined && die 1 "Install action was declined: $MODULE_ID"
+  # _confirm_was_declined && die 1 "Install action was declined: $MODULE_ID"
   _module_verify installed
 }
 
@@ -352,7 +354,7 @@ _module_delete_body() {
   local run_preflight="${1:-true}"
   [[ "$run_preflight" == "false" ]] || _module_preflight delete
   delete_steps
-  _confirm_was_declined && die 1 "Delete action was declined: $MODULE_ID"
+  # _confirm_was_declined && die 1 "Delete action was declined: $MODULE_ID"
   _module_verify deleted
 }
 

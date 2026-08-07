@@ -64,7 +64,7 @@ _backup_remove_target() {
 # name: backup_path
 # signature: backup_path MODULE_ID TARGET
 # summary: Back up an existing file, directory or symlink when backups are enabled.
-# returns: 0 when backed up or absent; 1 when the user declines the backup.
+# returns: 0
 # effects: Creates a collision-resistant backup under the additions state directory.
 # notes: Existing legacy backup names remain readable, but all new names include a target-path hash.
 # @end
@@ -83,7 +83,7 @@ backup_path() {
   backup_dir="${ADDITIONS_STATE_DIR:-$HOME/.local/state/dots-hyprland-additions}/backups/$module_id/$stamp"
   backup_name="$(_backup_target_key "$target")"
 
-  confirm_action local "Back up $target" "Создать резервную копию $target" || return 1
+  confirm_action local "Back up $target" "Создать резервную копию $target" || return 0
   mkdir -p -- "$backup_dir"
   log_info "Backup $target -> $backup_dir/$backup_name"
   _backup_copy_to_store "$target" "$backup_dir/$backup_name"
