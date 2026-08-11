@@ -12,7 +12,6 @@ from i18n import normalize_lang
 
 ROOT = Path(__file__).resolve().parents[1]
 ADDITIONS_DIR = ROOT / "additions"
-BUILTIN_SECTIONS = ("additions", "applications")
 VALID_DANGER = {"low", "medium", "high"}
 VALID_ACTIONS = {"install", "delete", "reinstall", "skip"}
 RUNTIME_ACTIONS = {"install", "delete", "reinstall"}
@@ -50,6 +49,114 @@ def _string_tuple(value: Any, field: str) -> tuple[str, ...]:
             raise ValueError(f"duplicate list entry in {field}: {text}")
         result.append(text)
     return tuple(result)
+
+
+@dataclass(frozen=True)
+class SectionMeta:
+    id: str
+    title: str
+    title_ru: str
+    module_paths: tuple[str, ...] = ()
+
+    def title_for(self, lang: str) -> str:
+        if normalize_lang(lang) == "ru" and self.title_ru:
+            return self.title_ru
+        return self.title
+
+
+# Single source of truth for TUI sections, translations, order and module paths.
+# Paths are exact and relative to additions/. A module's physical directory has
+# no semantic meaning: any registered path may belong to any registered section.
+SECTIONS: tuple[SectionMeta, ...] = (
+    SectionMeta(
+        id="additions",
+        title="Additions",
+        title_ru="Дополнения",
+        module_paths=(
+            "modules/hypr-keybinds.sh",
+            "modules/xdg-user-dirs.sh",
+            "modules/greetd-regreet.sh",
+            "modules/throne-vpn.sh",
+            "modules/neovim.sh",
+            "modules/tmux.sh",
+            "modules/hypr-kdeconnect-fix.sh",
+            "modules/selfhosted-music.sh"
+        ),
+    ),
+    SectionMeta(
+        id="applications",
+        title="Applications",
+        title_ru="Приложения",
+        module_paths=(
+            "apps/discord.sh",
+            "apps/dolphin-additions.sh",
+            "apps/easyeffects.sh",
+            "apps/firefox.sh",
+            "apps/gnome-text-editor.sh",
+            "apps/keepassxc.sh",
+            "apps/libreoffice.sh",
+            "apps/localsend.sh",
+            "apps/mission-center.sh",
+            "apps/obsidian.sh",
+            "apps/openssh.sh",
+            "apps/rust-toolchain.sh",
+            "apps/rustdesk.sh",
+            "apps/syncthing.sh",
+            "apps/telegram-desktop.sh",
+        ),
+    ),
+    SectionMeta(
+        id="embedded",
+        title="Embedded",
+        title_ru="Встроенное ПО",
+        module_paths=(
+            "embedded/arm-none-eabi.sh",
+            "embedded/jlink.sh",
+            "embedded/modm.sh",
+        ),
+    ),
+)
+
+
+def _build_section_index() -> dict[str, SectionMeta]:
+    result: dict[str, SectionMeta] = {}
+    registered_paths: dict[str, str] = {}
+
+    for section in SECTIONS:
+        if not SECTION_PATTERN.fullmatch(section.id):
+            raise RuntimeError(f"invalid registered section id: {section.id}")
+        if section.id in result:
+            raise RuntimeError(f"duplicate registered section id: {section.id}")
+        if not section.title.strip():
+            raise RuntimeError(f"registered section has no English title: {section.id}")
+
+        for module_path in section.module_paths:
+            path = Path(module_path)
+            if path.is_absolute() or ".." in path.parts or path.suffix != ".sh":
+                raise RuntimeError(
+                    f"invalid registered module path in {section.id}: {module_path}"
+                )
+            previous = registered_paths.get(module_path)
+            if previous is not None:
+                raise RuntimeError(
+                    f"module path registered twice: {module_path} ({previous}, {section.id})"
+                )
+            registered_paths[module_path] = section.id
+
+        result[section.id] = section
+
+    return result
+
+
+SECTION_BY_ID = _build_section_index()
+
+
+def _registered_module_paths() -> list[tuple[Path, str]]:
+    return [
+        (ADDITIONS_DIR / module_path, section.id)
+        for section in SECTIONS
+        for module_path in section.module_paths
+    ]
 
 
 @dataclass(frozen=True)
@@ -182,27 +289,32 @@ def _meta_from_script(path: Path) -> ModuleMeta:
 
 def discover_modules(with_status: bool = True) -> list[ModuleMeta]:
     modules: list[ModuleMeta] = []
-    for directory in (ADDITIONS_DIR / "modules", ADDITIONS_DIR / "apps"):
-        for path in sorted(directory.glob("*.sh")):
-            try:
-                meta = _meta_from_script(path)
-                if with_status:
-                    meta = meta_with_status(meta)
-                modules.append(meta)
-            except Exception as exc:  # noqa: BLE001 - one bad module must not break the TUI.
-                modules.append(
-                    ModuleMeta(
-                        id=path.stem,
-                        section="additions" if directory.name == "modules" else "applications",
-                        title=path.name,
-                        description=str(exc),
-                        default_action="skip",
-                        danger="high",
-                        path=path,
-                        status="error",
-                        meta_error=str(exc),
-                    )
+
+    for path, registered_section in _registered_module_paths():
+        try:
+            meta = _meta_from_script(path)
+            if meta.section != registered_section:
+                raise ValueError(
+                    f"section mismatch for {path}: "
+                    f"registry={registered_section}, module={meta.section}"
                 )
+            if with_status:
+                meta = meta_with_status(meta)
+            modules.append(meta)
+        except Exception as exc:  # noqa: BLE001 - one bad module must not break the TUI.
+            modules.append(
+                ModuleMeta(
+                    id=path.stem,
+                    section=registered_section,
+                    title=path.name,
+                    description=str(exc),
+                    default_action="skip",
+                    danger="high",
+                    path=path,
+                    status="error",
+                    meta_error=str(exc),
+                )
+            )
 
     counts = Counter(module.id for module in modules)
     duplicate_ids = {module_id for module_id, count in counts.items() if count > 1}

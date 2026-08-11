@@ -16,7 +16,7 @@ from i18n import (
     tr,
 )
 from module_api import check_api, emit_api
-from registry import BUILTIN_SECTIONS, ModuleMeta, discover_modules, module_by_id
+from registry import SECTIONS, ModuleMeta, SectionMeta, discover_modules, module_by_id
 from runner import (
     RunOptions,
     clear_terminal,
@@ -63,8 +63,8 @@ class RunRequest:
 @dataclass(frozen=True)
 class SectionSpec:
     id: str
-    translation_key: str
     module_section: str | None = None
+    registry_section: SectionMeta | None = None
 
 
 @dataclass
@@ -137,20 +137,17 @@ class AdditionsTui:
         self.collapsed = {section.id: False for section in self.sections}
 
     def _build_sections(self) -> list[SectionSpec]:
-        sections = [SectionSpec("settings", "settings")]
-        known = set()
-        for section_id in BUILTIN_SECTIONS:
-            sections.append(SectionSpec(section_id, section_id, section_id))
-            known.add(section_id)
-        for section_id in sorted({module.section for module in self.modules} - known):
-            sections.append(SectionSpec(section_id, section_id, section_id))
+        sections = [SectionSpec("settings")]
+        sections.extend(
+            SectionSpec(section.id, section.id, section)
+            for section in SECTIONS
+        )
         return sections
 
     def section_label(self, section: SectionSpec) -> str:
-        translated = tr(self.settings.lang, section.translation_key)
-        if translated == section.translation_key and section.id not in {"settings", *BUILTIN_SECTIONS}:
-            return section.id.replace("-", " ").title()
-        return translated
+        if section.registry_section is None:
+            return tr(self.settings.lang, "settings")
+        return section.registry_section.title_for(self.settings.lang)
 
     def selected_count(self) -> int:
         return sum(action != "skip" for action in self.actions.values())

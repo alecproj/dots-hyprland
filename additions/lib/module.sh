@@ -40,7 +40,7 @@ source "$ROOT/additions/lib/systemd.sh"
 # required: false
 # type: slug
 # default: additions
-# summary: Dynamic TUI section identifier; applications are placed in the applications section.
+# summary: Registered TUI section identifier; it must match the section containing this module path in additions/registry.py.
 # @end
 # @api
 # kind: metadata
