@@ -5,12 +5,12 @@ MODULE_ID="selfhosted-music"
 MODULE_SECTION="additions"
 MODULE_TITLE="Configure self-hosted music stack"
 MODULE_TITLE_RU="Настройка локального музыкального сервера"
-MODULE_DESCRIPTION="Installs Navidrome, Feishin and Nicotine+, configures /srv/music and /var/lib/navidrome, installs the legacy Navidrome configuration, links ~/Music/library and enables navidrome.service. Delete restores managed config and the library link, removes the three applications, and preserves music and service data directories."
-MODULE_DESCRIPTION_RU="Устанавливает Navidrome, Feishin и Nicotine+, настраивает /srv/music и /var/lib/navidrome, устанавливает прежнюю конфигурацию Navidrome, создаёт ссылку ~/Music/library и включает navidrome.service. Удаление восстанавливает управляемую конфигурацию и ссылку, удаляет три приложения, но сохраняет музыкальную библиотеку и данные сервиса."
+MODULE_DESCRIPTION="Installs Navidrome, Feishin and Nicotine+, kid3, configures /srv/music and /var/lib/navidrome, installs the legacy Navidrome configuration, links ~/Music/library and enables navidrome.service. Delete restores managed config and the library link, removes the four applications, and preserves music and service data directories."
+MODULE_DESCRIPTION_RU="Устанавливает Navidrome, Feishin и Nicotine+, kid3, настраивает /srv/music и /var/lib/navidrome, устанавливает прежнюю конфигурацию Navidrome, создаёт ссылку ~/Music/library и включает navidrome.service. Удаление восстанавливает управляемую конфигурацию и ссылку, удаляет четыре приложения, но сохраняет музыкальную библиотеку и данные сервиса."
 MODULE_VERSION="1"
 MODULE_DANGER="high"
 MODULE_DEFAULT_ACTION="skip"
-MODULE_PACKAGES=(navidrome feishin nicotine+)
+MODULE_PACKAGES=(navidrome feishin nicotine+ kid3)
 MODULE_REQUIRED_COMMANDS=(systemctl id find readlink)
 MODULE_FILES=(
   /srv/music
@@ -92,6 +92,7 @@ delete_steps() {
   remove_managed_path "$_SELFHOSTED_MUSIC_CONFIG"
   remove_managed_path "$_SELFHOSTED_MUSIC_LINK"
   remove_packages navidrome feishin nicotine+
+  remove_managed_packages kid3
   log_info "Preserved music and application data: $_SELFHOSTED_MUSIC_LIBRARY, $_SELFHOSTED_MUSIC_DATA, $_SELFHOSTED_MUSIC_NICOTINE"
 }
 

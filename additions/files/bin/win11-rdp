@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VM="win11"
+USER="alec"
+PASSWORD="0000"
+
+if ! virsh --connect qemu:///system list --name | grep -qx "$VM"; then
+    virsh --connect qemu:///system start "$VM"
+fi
+
+IP=""
+
+for _ in {1..30}; do
+    IP="$(virsh --connect qemu:///system domifaddr win11 \
+          | awk '/ipv4/ {print $4}' \
+          | cut -d/ -f1)"
+
+    if [[ -n "$IP" ]]; then
+        if timeout 1 bash -c "</dev/tcp/$IP/3389" 2>/dev/null; then
+            break
+        fi
+    fi
+
+    sleep 2
+done
+
+if [[ -z "$IP" ]]; then
+    notify-send "Windows 11" "VM IP address not found"
+    exit 1
+fi
+
+if ! timeout 1 bash -c "</dev/tcp/$IP/3389" 2>/dev/null; then
+    notify-send "Windows 11" "RDP service is not ready"
+    exit 1
+fi
+
+exec xfreerdp3 \
+    /v:"$IP" \
+    /u:"$USER" \
+    /p:"$PASSWORD" \
+    /clipboard \
+    /dynamic-resolution \
+    /sound \
+    /cert:ignore

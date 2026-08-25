@@ -80,7 +80,13 @@ SECTIONS: tuple[SectionMeta, ...] = (
             "modules/neovim.sh",
             "modules/tmux.sh",
             "modules/hypr-kdeconnect-fix.sh",
-            "modules/selfhosted-music.sh"
+            "modules/selfhosted-music.sh",
+            "modules/lampa.sh",
+            "modules/solaar.sh",
+            "modules/virtualization.sh",
+            "modules/smb-share.sh",
+            "modules/printing.sh",
+            "modules/win11-launcher.sh",
         ),
     ),
     SectionMeta(
@@ -103,6 +109,12 @@ SECTIONS: tuple[SectionMeta, ...] = (
             "apps/rustdesk.sh",
             "apps/syncthing.sh",
             "apps/telegram-desktop.sh",
+            "apps/spotify.sh",
+            "apps/fs-diagnostics.sh",
+            "apps/mpc-qt.sh",
+            "apps/vlc.sh",
+            "apps/kid3.sh",
+            "apps/pantum-driver.sh"
         ),
     ),
     SectionMeta(
@@ -113,6 +125,8 @@ SECTIONS: tuple[SectionMeta, ...] = (
             "embedded/arm-none-eabi.sh",
             "embedded/jlink.sh",
             "embedded/modm.sh",
+            "embedded/arduino-ide.sh",
+            "embedded/freecad.sh",
         ),
     ),
 )

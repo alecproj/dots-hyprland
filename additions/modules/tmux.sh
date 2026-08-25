@@ -104,8 +104,8 @@ install_steps() {
 delete_steps() {
   remove_managed_path "$TMUX_CONFIG"
   _tmux_remove_plugins
-  remove_packages tmux inetutils
-  remove_managed_packages git wl-clipboard
+  remove_packages tmux
+  remove_managed_packages git wl-clipboard inetutils
 }
 
 status_steps() {

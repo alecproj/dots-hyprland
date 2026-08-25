@@ -1,0 +1,9 @@
+# MX Master 3S [down button -> CTRL]
+---
+- Key: [Mouse Gesture Button, pressed]
+- KeyPress: [Control_L, depress]
+...
+---
+- Key: [Mouse Gesture Button, released]
+- KeyPress: [Control_L, release]
+...
